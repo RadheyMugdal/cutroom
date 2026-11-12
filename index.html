@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cutroom Video Editor</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><i></i>Cutroom</div>
+  <span class="pill" id="projTag">Sample project</span>
+  <div class="spacer"></div>
+  <button id="undo" title="Undo (Ctrl+Z)">Undo</button>
+  <button id="redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+  <select id="aspect" aria-label="Frame shape">
+    <option value="16:9">16:9 landscape</option>
+    <option value="9:16">9:16 vertical</option>
+    <option value="1:1">1:1 square</option>
+  </select>
+  <button class="primary" id="exportBtn">Export video</button>
+</header>
+
+<main>
+  <aside id="bin">
+    <div class="tabs"><button id="tabM" class="on">Media</button><button id="tabS">Transcript</button></div>
+    <div class="pane" id="paneMedia">
+    
+    <div class="btnrow">
+      <button class="primary" id="importBtn">Import files</button>
+      <button id="addText">Add text</button>
+    </div>
+    <div class="drop">Drop video, audio or image files anywhere. Files stay on your device.</div>
+    <div id="mediaList" style="display:grid;grid-template-columns:minmax(0,1fr);gap:6px"></div>
+    <button class="ghost" id="newBtn">New project</button>
+  </div>
+    <div class="pane" id="paneScript" hidden></div>
+  </aside>
+
+  <section id="stage">
+    <div id="view"><canvas id="cv" width="1280" height="720"></canvas></div>
+    <div class="transport">
+      <button id="toStart" title="Go to start">Start</button>
+      <button id="play" class="primary">Play</button>
+      <div class="tc"><b id="tcNow">0:00.00</b> <span>/ <b id="tcDur">0:00.00</b></span></div>
+      <div class="spacer"></div>
+      <span class="hint" id="selHint"></span>
+    </div>
+  </section>
+
+  <aside id="insp"></aside>
+</main>
+
+<section id="timeline">
+  <div class="tbar">
+    <button id="splitBtn" title="Split at playhead (S)">Split</button>
+    <button id="delBtn" title="Delete selected (Del)">Delete</button>
+    <span class="hint tsep">Add track</span>
+    <button id="addV" title="Add a video layer above the others">Video</button>
+    <button id="addT" title="Add a text track">Text</button>
+    <button id="addA" title="Add an audio track">Audio</button>
+    <span id="toast"></span>
+    <div class="spacer"></div>
+    <label class="hint" for="zoom">Zoom</label>
+    <input type="range" id="zoom" min="15" max="260" value="80">
+  </div>
+  <div class="tbody">
+    <div class="labels" id="labels"></div>
+    <div id="scroll"><div id="inner"></div></div>
+  </div>
+</section>
+
+<div class="modal" id="dlg" hidden>
+  <div class="card">
+    <h3>Export video</h3>
+    <div id="dlgSetup" style="display:grid;gap:12px">
+      <div class="inline">
+        <div class="field"><label for="exRes">Resolution</label>
+          <select id="exRes"><option value="720">720p</option><option value="1080" selected>1080p</option></select></div>
+        <div class="field"><label for="exFps">Frame rate</label>
+          <select id="exFps"><option value="30" selected>30 fps</option><option value="60">60 fps</option></select></div>
+      </div>
+      <p class="hint" id="exInfo"></p>
+    </div>
+    <div id="dlgRun" hidden style="display:grid;gap:8px">
+      <div class="bar"><i id="exBar"></i></div>
+      <p class="hint" id="exStatus"></p>
+    </div>
+    <div class="right">
+      <button id="exClose">Close</button>
+      <button class="primary" id="exGo">Start export</button>
+      <button class="primary" id="exSave" hidden>Save file</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="file" multiple accept="video/*,audio/*,image/*" hidden>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
