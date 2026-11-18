@@ -28,7 +28,7 @@ function clipHtml(c: Clip, pps: number): string {
   const fi = c.kind !== 'text' && c.fadeIn ? `<i class="fade" style="left:0;width:${c.fadeIn * pps}px"></i>` : '';
   const fo = c.kind !== 'text' && c.fadeOut ? `<i class="fade out" style="right:0;width:${c.fadeOut * pps}px"></i>` : '';
   return `<div class="clip ${c.kind}${S.sel.includes(c.id) ? ' sel' : ''}${m?.missing ? ' missing' : ''}" data-id="${c.id}" style="left:${c.start * pps}px;width:${w}px" title="${esc(label(c))} · ${fmt(d)}">`
-    + art + fi + fo + kfTimes(c).filter(t => t >= 0 && t <= d).map(t => `<i class="kfd" data-t="${c.start + t}" style="left:${t * pps}px" title="Keyframe: click to go here"></i>`).join('')
+    + art + fi + fo + kfTimes(c).filter(t => t >= 0 && t <= d).map(t => `<i class="kfd" data-lt="${t}" style="left:${t * pps}px" title="Keyframe: click to go here, drag to retime"></i>`).join('')
     + `<i class="hd l"></i><span class="nm">${esc(label(c))}</span><i class="hd r"></i></div>`;
 }
 
@@ -100,7 +100,7 @@ function snapMove(start: number, dur: number, pts: number[]): number {
 }
 
 /* ---------- dragging ---------- */
-type Drag = { mode: 'scrub' } | { mode: 'l' | 'r' | 'move'; c: Clip; x0: number; grab: number; o: Map<string, any>; pts: number[]; moved: boolean };
+type Drag = { mode: 'scrub' } | { mode: 'kf'; c: Clip; x0: number; t0: number; o: Record<string, { t: number; v: number }[]>; moved: boolean } | { mode: 'l' | 'r' | 'move'; c: Clip; x0: number; grab: number; o: Map<string, any>; pts: number[]; moved: boolean };
 let drag: Drag | null = null;
 const xToT = (e: PointerEvent) => (e.clientX - $('#inner').getBoundingClientRect().left) / S.pps;
 function trackAt(y: number): TrackDef | undefined {
@@ -114,6 +114,13 @@ function onMove(e: PointerEvent) {
   if (!drag) return;
   if (drag.mode === 'scrub') { seek(xToT(e)); return; }
   if (Math.abs(e.clientX - drag.x0) < 3 && !drag.moved) return;
+  if (drag.mode === 'kf') {
+    // Retime every keyframe that sits at the dragged diamond's original time.
+    const { c, t0, o } = drag; drag.moved = true; S.snapX = null;
+    const nt = clamp(snapEdge(xToT(e), [S.t]) - c.start, 0, clipDur(c)), kf: typeof o = {};
+    for (const p in o) kf[p] = o[p].map(q => ({ t: Math.abs(q.t - t0) < 2e-3 ? nt : q.t, v: q.v })).sort((a, b) => a.t - b.t);
+    c.kf = kf; renderTimeline(); return;
+  }
   drag.moved = true; S.snapX = null;
   const { mode, pts } = drag, c: any = drag.c, o = drag.o.get(c.id), dx = (e.clientX - drag.x0) / S.pps;
   const main = mainTrack(), isMain = c.track === main?.id;
@@ -161,7 +168,12 @@ export function initTimeline() {
       else { S.sel = [c.id]; notify(); }
       e.preventDefault(); return;
     }
-    if (target.classList.contains('kfd')) { pause(); seek(+target.dataset.t!); S.sel = [ce!.dataset.id!]; notify(); e.preventDefault(); return; }
+    if (target.classList.contains('kfd')) {   // a click jumps to the keyframe; a drag moves it
+      const c = S.P.clips.find(x => x.id === ce!.dataset.id)!, t0 = +target.dataset.lt!;
+      pause(); S.sel = [c.id];
+      drag = { mode: 'kf', c, x0: e.clientX, t0, o: JSON.parse(JSON.stringify(c.kf || {})), moved: false };
+      notify(); e.preventDefault(); return;
+    }
     if (!ce) {
       if (!target.closest('.ruler') && S.sel.length) { S.sel = []; notify(); }
       pause(); seek(xToT(e)); drag = { mode: 'scrub' }; e.preventDefault(); return;
@@ -181,6 +193,7 @@ export function initTimeline() {
   window.addEventListener('pointerup', () => {
     if (!drag) return;
     const d = drag; drag = null; S.snapX = null;
+    if (d.mode === 'kf' && !d.moved) { seek(d.c.start + d.t0); return; }
     if (d.mode === 'scrub' || !d.moved) return;
     if (d.mode === 'move') selected().forEach(resolveOverlap);
     S.own = true; commit();

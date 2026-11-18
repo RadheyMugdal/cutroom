@@ -27,6 +27,8 @@ export interface TextClip extends Base {
   kind: 'text'; text: string; dur: number; x: number; y: number; size: number; rot: number;
   font: string; bold: boolean; color: string; bg: boolean; bgColor: string; anim: 'none' | 'fade' | 'slide' | 'pop';
   cap?: boolean;   // generated from a transcript; replaced when captions are updated
+  words?: { a: number; b: number; w: string }[];   // captions: each word with its time from the start of the clip
+  hl?: string;     // captions: colour for the word being spoken ('' or missing = no highlight)
 }
 export interface AudioClip extends Base { kind: 'audio'; mediaId: string; in: number; out: number; volume: number; fadeIn: number; fadeOut: number }
 export type Clip = VideoClip | TextClip | AudioClip;

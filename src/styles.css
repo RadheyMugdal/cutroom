@@ -159,3 +159,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2px 0;width:100%}
 .script .w:hover{background:var(--raised)}
 .script .w.now{color:var(--accent)}
 .script .w.sel{background:var(--c-text);color:#fff}
+
+/* ---------- stage 4a: recording ---------- */
+#recView{width:100%;max-height:240px;background:#000;border-radius:8px}
+.clip .kfd{cursor:ew-resize}

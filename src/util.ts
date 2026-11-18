@@ -22,3 +22,20 @@ export function h(tag: string, props?: Record<string, any> | null, ...kids: any[
   }
   return e;
 }
+
+/** True on the hosted Claude preview page, which limits downloads, recording and requests to other sites. */
+export const hosted = 'claude' in window;
+
+/** Hand a generated file to the user. Returns a short status sentence. */
+export async function saveFile(blob: Blob, name: string): Promise<string> {
+  // The hosted preview saves through its host; everywhere else a normal download works.
+  let host: any = null;
+  try { const c = (window as any).claude; if (c?.use) host = await c.use('downloads'); } catch { /* not hosted */ }
+  if (host) {
+    try { await host.save({ filename: name, data: blob }); return 'Saved.'; }
+    catch (e: any) { return e?.code === 'declined' ? 'Save was cancelled. You can try again.' : 'The file could not be saved here' + (e?.message ? ': ' + e.message : '.'); }
+  }
+  const a = h('a', { href: URL.createObjectURL(blob), download: name }) as HTMLAnchorElement;
+  document.body.append(a); a.click(); a.remove();
+  return 'Saved to your downloads folder.';
+}

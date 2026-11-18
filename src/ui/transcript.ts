@@ -2,9 +2,9 @@ import { S, notify } from '../state';
 import { media } from '../media';
 import { pause, seek } from '../playback';
 import { LANGS, MODELS } from '../speech';
-import { clipWords, deleteWords, makeCaptions, removeFillers, removeSilences, spokenClips, transcribeAll } from '../speechActions';
+import { captionsSrt, clipWords, deleteWords, makeCaptions, removeFillers, removeSilences, spokenClips, transcribeAll } from '../speechActions';
 import { toast } from '../actions';
-import { $, h } from '../util';
+import { $, h, hosted, saveFile } from '../util';
 
 /** The Transcript tab: transcribe speech, add captions, and cut the video by deleting words. */
 let tab: 'media' | 'script' = 'media';
@@ -14,7 +14,6 @@ let spans: { el: HTMLElement; a: number; b: number; clip: string; i: number }[] 
 
 const pref = (k: string, d: string) => { try { return localStorage.getItem('cutroom.' + k) || d; } catch { return d; } };
 const setPref = (k: string, v: string) => { try { localStorage.setItem('cutroom.' + k, v); } catch { /* not available */ } };
-const hosted = 'claude' in window;   // the hosted preview page blocks downloads from other sites, including the speech model
 
 function showTab(t: 'media' | 'script') {
   tab = t;
@@ -69,7 +68,10 @@ export function renderTranscript() {
       h('button', { onclick: removeSilences, title: 'Cut pauses longer than about half a second from the selected clips, or from the main track' }, 'Remove silences')),
     h('div', { class: 'btnrow' },
       h('button', { id: 'delWords', disabled: !wsel, onclick: deleteSelectedWords }, 'Delete selected words'),
-      h('button', { disabled: !any, onclick: removeFillers }, 'Remove filler words')));
+      h('button', { disabled: !any, onclick: removeFillers }, 'Remove filler words')),
+    // The hosted preview only allows a few file types, so the subtitle file is saved as text there.
+    h('button', { disabled: !S.P.clips.some(c => c.kind === 'text' && c.cap), title: 'Save the captions as a subtitle file for YouTube and other players',
+      onclick: async () => toast(await saveFile(new Blob([captionsSrt()], { type: 'text/plain' }), hosted ? 'captions-srt.txt' : 'captions.srt')) }, 'Download subtitles (.srt)'));
 
   if (any) {
     box.append(h('hr'), h('h2', {}, 'Transcript'), h('p', { class: 'hint' }, 'Click a word to jump there. Shift-click another to select a range, then delete it to cut the video.'));

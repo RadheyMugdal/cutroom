@@ -136,7 +136,16 @@ function drawText(ctx: CanvasRenderingContext2D, W: number, H: number, x: TextCl
     ctx.fill();
   } else { ctx.shadowColor = 'rgba(0,0,0,.65)'; ctx.shadowBlur = px * .18; ctx.shadowOffsetY = px * .04; }
   ctx.fillStyle = x.color;
-  lines.forEach((l, i) => ctx.fillText(l, 0, -th / 2 + lh * (i + .5)));
+  if (x.hl && x.words && lines.length === 1 && x.words.map(w => w.w).join(' ') === x.text) {
+    // Caption with word timing: draw word by word so the one being spoken can take the highlight colour.
+    ctx.textAlign = 'left';
+    const space = ctx.measureText(' ').width; let at = -tw / 2;
+    x.words.forEach((w, i) => {
+      const next = x.words![i + 1];
+      ctx.fillStyle = local >= w.a && local < (next ? next.a : Infinity) ? x.hl! : x.color;
+      ctx.fillText(w.w, at, 0); at += ctx.measureText(w.w).width + space;
+    });
+  } else lines.forEach((l, i) => ctx.fillText(l, 0, -th / 2 + lh * (i + .5)));
   ctx.restore();
   boxes?.push({ id: x.id, cx, cy, w: tw + pad * 2, h: th + pad * 2, rot });
 }

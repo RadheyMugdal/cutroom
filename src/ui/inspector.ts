@@ -118,7 +118,12 @@ export function renderInspector() {
       h('hr'), h('h2', {}, 'Placement'),
       aslider('Horizontal position', c, 'x', 0, 1, .005, frac), aslider('Vertical position', c, 'y', 0, 1, .005, frac), aslider('Rotation', c, 'rot', -180, 180, 1, deg),
       slider('Duration', c, 'dur', .3, 30, .1, sec));
-    if (c.cap) box.append(h('button', { onclick: () => styleAllCaptions(c) }, 'Use this style for all captions'));
+    if (c.cap) box.append(...([h('hr'), h('h2', {}, 'Caption'),
+      h('div', { class: 'inline' },
+        h('label', { class: 'chk' }, h('input', { type: 'checkbox', id: 'f-hlon', checked: !!c.hl, onchange: (e: Event) => { c.hl = (e.target as HTMLInputElement).checked ? '#ffb224' : ''; done(); } }), 'Highlight the spoken word'),
+        c.hl ? color('f-hl', 'Highlight colour', c, 'hl') : null),
+      c.words && c.words.map((w: any) => w.w).join(' ') !== c.text ? h('p', { class: 'hint' }, 'The text was edited, so word highlighting is off for this caption.') : null,
+      h('button', { onclick: () => styleAllCaptions(c) }, 'Use this style for all captions')].filter(Boolean) as HTMLElement[]));
   } else if (c.kind === 'video') {
     if (m?.kind === 'video') box.append(slider('Speed', c, 'speed', .25, 4, .05, v => (+v).toFixed(2) + '×'), aslider('Volume', c, 'volume', 0, 2, .01, frac), check('f-mute', 'Mute this clip', c, 'mute'));
     box.append(

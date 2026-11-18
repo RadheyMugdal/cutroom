@@ -10,6 +10,7 @@ import { FONTS, renderInspector, tickInspector } from './ui/inspector';
 import { renderBin } from './ui/bin';
 import { exportOpen, initExportDialog } from './ui/exportDialog';
 import { initStage } from './ui/stage';
+import { initRecord } from './ui/record';
 import { deleteSelectedWords, initTranscript, renderTranscript, tickTranscript } from './ui/transcript';
 import { setEngine } from './speech';
 import { $, fmt, uid } from './util';
@@ -74,7 +75,7 @@ async function boot() {
   initPreview($('#cv') as HTMLCanvasElement, $('#view'),
     () => { $('#tcNow').textContent = fmt(S.t); tickTimeline(); tickInspector(); tickTranscript(); },
     () => { $('#play').textContent = S.playing ? 'Pause' : 'Play'; });
-  initTimeline(); initExportDialog(); initStage($('#cv') as HTMLCanvasElement); initTranscript();
+  initTimeline(); initExportDialog(); initStage($('#cv') as HTMLCanvasElement); initTranscript(); initRecord();
   onChange(() => { syncEls(); sizeCanvas(); renderAll(); scheduleSave(); });
 
   /* ---------- buttons ---------- */

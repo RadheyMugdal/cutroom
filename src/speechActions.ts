@@ -86,13 +86,13 @@ export function clipWords(c: Spoken): TWord[] {
   return out;
 }
 
-const CAP_STYLE = ['x', 'y', 'size', 'rot', 'font', 'bold', 'color', 'bg', 'bgColor', 'anim'] as const;
+const CAP_STYLE = ['x', 'y', 'size', 'rot', 'font', 'bold', 'color', 'bg', 'bgColor', 'anim', 'hl'] as const;
 /** Create caption clips from the transcripts, replacing earlier captions but keeping their styling. */
 export function makeCaptions(commitNow = true) {
   const old = S.P.clips.filter((c): c is TextClip => c.kind === 'text' && !!c.cap);
   // Narrow frames fit fewer characters per line.
   const [maxChars, size] = S.P.aspect === '9:16' ? [18, 3.6] : S.P.aspect === '1:1' ? [24, 4.5] : [32, 5];
-  const style: any = { x: .5, y: .86, size, rot: 0, font: 'Figtree', bold: true, color: '#ffffff', bg: true, bgColor: '#111111', anim: 'none' };
+  const style: any = { x: .5, y: .86, size, rot: 0, font: 'Figtree', bold: true, color: '#ffffff', bg: true, bgColor: '#111111', anim: 'none', hl: '#ffb224' };
   if (old[0]) for (const k of CAP_STYLE) style[k] = (old[0] as any)[k];
   let track = S.P.tracks.find(t => t.kind === 'text' && t.name === 'Captions');
   if (!track) { track = addTrack('text'); track.name = 'Captions'; }
@@ -102,7 +102,8 @@ export function makeCaptions(commitNow = true) {
     .flatMap(c => captionLines(clipWords(c), maxChars)).sort((p, q) => p[0].a - q[0].a);
   lines.forEach((ln, i) => {
     const start = ln[0].a, next = lines[i + 1]?.[0].a ?? Infinity, end = Math.max(start + .3, Math.min(ln[ln.length - 1].b + .15, next));
-    S.P.clips.push({ id: uid(), kind: 'text', track: track!.id, text: ln.map(w => w.w).join(' '), start, dur: end - start, ...style, cap: true } as TextClip);
+    S.P.clips.push({ id: uid(), kind: 'text', track: track!.id, text: ln.map(w => w.w).join(' '), start, dur: end - start, ...style, cap: true,
+      words: ln.map(w => ({ a: w.a - start, b: w.b - start, w: w.w })) } as TextClip);
   });
   if (commitNow) { S.own = true; commit(); toast(lines.length ? `Added ${lines.length} captions.` : 'There is no transcript to caption yet.'); }
 }
@@ -140,4 +141,14 @@ export function removeFillers() {
   if (!n) return toast('No filler words (um, uh, er) were found in the transcript.');
   finish([]);
   toast(`Removed ${n} filler word${n > 1 ? 's' : ''}.`);
+}
+
+/** The captions on the timeline as an SRT subtitle file. */
+export function captionsSrt(): string {
+  const stamp = (t: number) => {
+    const ms = Math.round(t * 1000), p = (n: number, l = 2) => String(n).padStart(l, '0');
+    return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`;
+  };
+  return S.P.clips.filter((c): c is TextClip => c.kind === 'text' && !!c.cap).sort((p, q) => p.start - q.start)
+    .map((c, i) => `${i + 1}\n${stamp(c.start)} --> ${stamp(c.start + c.dur)}\n${c.text}\n`).join('\n');
 }

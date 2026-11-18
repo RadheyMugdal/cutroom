@@ -28,6 +28,9 @@ If `npm install` fails while setting up `onnxruntime-node`, run `npm install --i
 - Speech to text (Transcript tab): Whisper runs in a worker on the GPU or CPU, with word-level timing, in many languages. The model is downloaded from Hugging Face on first use and cached.
 - Auto captions from the transcript, as ordinary text clips you can restyle (one click applies a style to all).
 - Edit by transcript: select words and delete them to cut the video. One-click removal of filler words and of silences.
+- Recording: screen, camera or a voiceover (optionally while the timeline plays), added straight to the timeline.
+- Output: platform presets (YouTube, Shorts/Reels/TikTok, Instagram square, 4K), four quality levels, animated GIF, and the current frame as a PNG.
+- Captions highlight the word being spoken, and can be downloaded as an .srt subtitle file.
 - Text overlays with fonts, colours, background box and entrance animations.
 - Per-clip volume, mute and audio fades.
 - Preset looks, colour and blur sliders, speed changes, fades.
@@ -52,6 +55,7 @@ If `npm install` fails while setting up `onnxruntime-node`, run `npm install --i
 | `src/actions.ts` | Editing commands: add, split, duplicate, delete, tracks, import |
 | `src/ui/timeline.ts` | Timeline rows, clip artwork, snapping, dragging |
 | `src/ui/stage.ts` | Move, resize and rotate handles on the preview |
+| `src/ui/record.ts` | Screen, camera and voiceover recording |
 | `src/ui/*` | Inspector, media list, export dialog |
 
 The rule that keeps preview and export identical: anything visual goes in `render.ts`, and it must depend only on the project and a time, never on the DOM or the wall clock.
@@ -59,14 +63,16 @@ The rule that keeps preview and export identical: anything visual goes in `rende
 ## Known limits
 
 - The main track is sequential (no gaps); layers above it are free. Transitions exist only between main-track clips.
-- Keyframes cannot be dragged on the timeline yet; remove and re-add one to retime it. Position, size and rotation ease in and out; opacity and volume are linear.
+- Drag a keyframe diamond on the timeline to retime it. Position, size and rotation ease in and out; opacity and volume are linear.
 - Crop is set with sliders, not by dragging on the preview.
 - Waveforms are skipped for audio files over 300 MB.
 - Export decodes each source's whole audio into memory, so very long files (roughly an hour and up) may run out of memory.
 - Speed changes keep pitch in the preview but shift pitch in the export.
 - Colour filters use the canvas `filter` property, which Safari does not fully support.
 - Transcription and silence removal decode the whole file's audio in memory.
-- Captions are one line per clip, without word-by-word highlighting. There is no SRT export yet.
+- Captions are one line per clip. Editing a caption's text turns off its word highlighting.
+- GIF export is capped at 30 seconds, 480 pixels and 12 frames a second.
+- Recording needs camera, microphone or screen permission, so it does not work on the hosted preview page.
 - Cutting by transcript is only as precise as the recogniser's word timing.
 - The UI is plain TypeScript without a framework.
 
@@ -75,4 +81,4 @@ The rule that keeps preview and export identical: anything visual goes in `rende
 1. Engine (this stage): codebase, fast export, autosave.
 2. Editing depth (done): multiple tracks, snapping, thumbnails, waveforms, transforms, transitions, keyframes.
 3. Differentiators (done, first version): in-browser auto captions, edit by transcript, silence and filler removal.
-4. Everything else: recording, green screen, background removal, audio clean-up, templates, platform presets.
+4. Everything else: recording and output presets are done. Still to come: crop handles, pitch-correct speed, green screen, masks, blend modes, LUTs, audio clean-up, shapes and templates, background removal.

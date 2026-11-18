@@ -31,6 +31,7 @@
     <div class="btnrow">
       <button class="primary" id="importBtn">Import files</button>
       <button id="addText">Add text</button>
+      <button id="recBtn">Record</button>
     </div>
     <div class="drop">Drop video, audio or image files anywhere. Files stay on your device.</div>
     <div id="mediaList" style="display:grid;grid-template-columns:minmax(0,1fr);gap:6px"></div>
@@ -76,12 +77,18 @@
   <div class="card">
     <h3>Export video</h3>
     <div id="dlgSetup" style="display:grid;gap:12px">
-      <div class="inline">
+      <div class="field"><label for="exKind">What to export</label>
+        <select id="exKind"><option value="video">Video (MP4)</option><option value="gif">Animated GIF</option><option value="png">Current frame (PNG image)</option></select></div>
+      <div class="field" id="exPresetRow"><label for="exPreset">Preset</label>
+        <select id="exPreset"><option value="">Custom</option><option value="16:9|1080|30">YouTube (16:9, 1080p)</option><option value="9:16|1080|30">Shorts, Reels, TikTok (9:16, 1080p)</option><option value="1:1|1080|30">Instagram square (1:1, 1080p)</option><option value="16:9|2160|30">YouTube 4K (16:9, 2160p)</option></select></div>
+      <div class="inline" id="exResRow">
         <div class="field"><label for="exRes">Resolution</label>
-          <select id="exRes"><option value="720">720p</option><option value="1080" selected>1080p</option></select></div>
-        <div class="field"><label for="exFps">Frame rate</label>
-          <select id="exFps"><option value="30" selected>30 fps</option><option value="60">60 fps</option></select></div>
+          <select id="exRes"><option value="480">480p</option><option value="720">720p</option><option value="1080" selected>1080p</option><option value="1440">1440p</option><option value="2160">2160p (4K)</option></select></div>
+        <div class="field" id="exFpsBox"><label for="exFps">Frame rate</label>
+          <select id="exFps"><option value="24">24 fps</option><option value="30" selected>30 fps</option><option value="60">60 fps</option></select></div>
       </div>
+      <div class="field" id="exQRow"><label for="exQ">Quality</label>
+        <select id="exQ"><option value="small">Smaller file</option><option value="balanced">Balanced</option><option value="best" selected>High</option><option value="max">Highest, largest file</option></select></div>
       <p class="hint" id="exInfo"></p>
     </div>
     <div id="dlgRun" hidden style="display:grid;gap:8px">
@@ -93,6 +100,17 @@
       <button class="primary" id="exGo">Start export</button>
       <button class="primary" id="exSave" hidden>Save file</button>
     </div>
+  </div>
+</div>
+<div class="modal" id="recDlg" hidden>
+  <div class="card">
+    <h3>Record</h3>
+    <div class="field"><label for="recKind">Source</label>
+      <select id="recKind"><option value="screen">Screen or window</option><option value="camera">Camera and microphone</option><option value="voice">Voiceover (microphone only)</option></select></div>
+    <label class="chk" id="recPlayRow" hidden><input type="checkbox" id="recPlay" checked>Play the timeline while recording</label>
+    <video id="recView" muted playsinline hidden></video>
+    <p class="hint" id="recStatus"></p>
+    <div class="right"><button id="recClose">Close</button><button class="primary" id="recGo">Start recording</button></div>
   </div>
 </div>
 <input type="file" id="file" multiple accept="video/*,audio/*,image/*" hidden>

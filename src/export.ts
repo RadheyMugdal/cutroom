@@ -1,7 +1,8 @@
 import {
   ALL_FORMATS, AudioBufferSource, BlobSource, BufferTarget, CanvasSink, CanvasSource, Input, Mp4OutputFormat, Output,
-  QUALITY_HIGH, WebMOutputFormat, getFirstEncodableAudioCodec, getFirstEncodableVideoCodec, type WrappedCanvas,
+  QUALITY_HIGH, QUALITY_LOW, QUALITY_MEDIUM, QUALITY_VERY_HIGH, WebMOutputFormat, getFirstEncodableAudioCodec, getFirstEncodableVideoCodec, type WrappedCanvas,
 } from 'mediabunny';
+import { GIFEncoder, applyPalette, quantize } from 'gifenc';
 import type { Media, Project, VideoClip } from './types';
 import { S, layout, total } from './state';
 import { media } from './media';
@@ -96,13 +97,46 @@ async function mixAudio(P: Project, end: number, rate = 48000): Promise<AudioBuf
 // A yield that is not throttled when the tab is in the background (unlike setTimeout).
 const breathe = () => new Promise<void>(ok => { const ch = new MessageChannel(); ch.port1.onmessage = () => ok(); ch.port2.postMessage(0); });
 
-export async function exportVideo(o: ExportOpts): Promise<{ blob: Blob; ext: string } | null> {
+/** A frozen copy of the project and a canvas of the right size to render it into. */
+function setup(short: number) {
   const P: Project = JSON.parse(JSON.stringify(S.P));
   layout(P);
-  const end = total(P);
-  const [W, H] = dims(P.aspect, o.short);
+  const end = total(P), [W, H] = dims(P.aspect, short);
   const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
+  return { P, end, W, H, canvas, ctx: canvas.getContext('2d', { willReadFrequently: short <= 480 })! };
+}
+
+/**
+ * Render the project at each of the given times, in order, handing every finished frame to sink.
+ * Returns false if the user cancelled.
+ */
+async function renderTimes(r: ReturnType<typeof setup>, times: number[], o: Pick<ExportOpts, 'onProgress' | 'isCancelled'>, sink: (t: number, i: number) => Promise<void>): Promise<boolean> {
+  const { P, end, W, H, ctx } = r, cursors = new Map<string, Cursor>();
+  const closeAll = async () => { for (const c of cursors.values()) await c.close().catch(() => {}); cursors.clear(); };
+  try {
+    for (let i = 0; i < times.length; i++) {
+      if (o.isCancelled()) return false;
+      const t = times[i], active = activeVideoClips(P, t, end).filter(c => { const m = media.get(c.mediaId); return m?.kind === 'video' && m.file; });
+      for (const [id, cur] of cursors) if (!active.some(c => c.id === id)) { await cur.close().catch(() => {}); cursors.delete(id); }
+      for (const c of active) {
+        let cur = cursors.get(c.id);
+        if (!cur) { cur = await openCursor(c, media.get(c.mediaId)!); cursors.set(c.id, cur); }
+        await cur.advance(c.in + (Math.min(t, end - 1e-4) - c.start) * c.speed);
+      }
+      renderFrame(ctx, W, H, P, t, end, clip => cursors.get(clip.id)?.frame() ?? null);
+      await sink(t, i);
+      if (i % 6 === 0) { o.onProgress(i / times.length, 'Rendering'); await breathe(); }
+    }
+    return true;
+  } finally { await closeAll(); }
+}
+
+const QUALITY = { small: QUALITY_LOW, balanced: QUALITY_MEDIUM, best: QUALITY_HIGH, max: QUALITY_VERY_HIGH };
+export type QualityName = keyof typeof QUALITY;
+export interface Exported { blob: Blob; ext: string }
+
+export async function exportVideo(o: ExportOpts & { quality?: QualityName }): Promise<Exported | null> {
+  const r = setup(o.short), { P, end, W, H, canvas } = r, q = QUALITY[o.quality || 'best'];
 
   o.onProgress(0, 'Mixing audio');
   const audio = await mixAudio(P, end);
@@ -114,7 +148,7 @@ export async function exportVideo(o: ExportOpts): Promise<{ blob: Blob; ext: str
   const acodec = audio ? await getFirstEncodableAudioCodec(format.getSupportedAudioCodecs(), { numberOfChannels: 2, sampleRate: 48000 }) : null;
 
   const output = new Output({ format, target: new BufferTarget() });
-  const vs = new CanvasSource(canvas, { codec: vcodec, bitrate: QUALITY_HIGH, keyFrameInterval: 2 });
+  const vs = new CanvasSource(canvas, { codec: vcodec, bitrate: q, keyFrameInterval: 2 });
   output.addVideoTrack(vs, { frameRate: o.fps });
   let as: AudioBufferSource | null = null;
   if (audio && acodec) { as = new AudioBufferSource({ codec: acodec, bitrate: QUALITY_HIGH }); output.addAudioTrack(as); }
@@ -124,31 +158,39 @@ export async function exportVideo(o: ExportOpts): Promise<{ blob: Blob; ext: str
   let audioError: unknown = null;
   const audioDone = as ? as.add(audio!).catch(e => { audioError = e; }) : Promise.resolve();
 
-  const N = Math.max(1, Math.round(end * o.fps)), cursors = new Map<string, Cursor>();
-  const closeAll = async () => { for (const c of cursors.values()) await c.close().catch(() => {}); cursors.clear(); };
+  const N = Math.max(1, Math.round(end * o.fps)), times = Array.from({ length: N }, (_, i) => i / o.fps);
   try {
-    for (let i = 0; i < N; i++) {
-      if (o.isCancelled()) { await closeAll(); await output.cancel(); return null; }
-      const t = i / o.fps, active = activeVideoClips(P, t, end).filter(c => { const m = media.get(c.mediaId); return m?.kind === 'video' && m.file; });
-      for (const [id, cur] of cursors) if (!active.some(c => c.id === id)) { await cur.close().catch(() => {}); cursors.delete(id); }
-      for (const c of active) {
-        let cur = cursors.get(c.id);
-        if (!cur) { cur = await openCursor(c, media.get(c.mediaId)!); cursors.set(c.id, cur); }
-        await cur.advance(c.in + (Math.min(t, end - 1e-4) - c.start) * c.speed);
-      }
-      renderFrame(ctx, W, H, P, t, end, clip => cursors.get(clip.id)?.frame() ?? null);
-      await vs.add(t, 1 / o.fps);
-      if (i % 6 === 0) { o.onProgress(i / N, 'Rendering'); await breathe(); }
-    }
-    await closeAll();
+    if (!(await renderTimes(r, times, o, t => vs.add(t, 1 / o.fps)))) { await output.cancel(); return null; }
     await audioDone;
     if (audioError) throw audioError;
     o.onProgress(1, 'Finishing');
     await output.finalize();
   } catch (e) {
-    await closeAll();
     if (output.state !== 'canceled' && output.state !== 'finalized') await output.cancel().catch(() => {});
     throw e;
   }
   return { blob: new Blob([output.target.buffer!], { type: format.mimeType }), ext: format.fileExtension.replace('.', '') };
+}
+
+export const GIF_MAX_SECONDS = 30;
+/** Animated GIF: small, silent, 12 frames a second, at most 480 pixels on the long side. */
+export async function exportGif(o: Pick<ExportOpts, 'onProgress' | 'isCancelled'>): Promise<Exported | null> {
+  const [a, b] = S.P.aspect.split(':').map(Number), fps = 12;
+  const r = setup(Math.round(480 * Math.min(a, b) / Math.max(a, b) / 2) * 2), { W, H, ctx } = r;
+  const n = Math.max(1, Math.round(Math.min(r.end, GIF_MAX_SECONDS) * fps)), gif = GIFEncoder();
+  const ok = await renderTimes(r, Array.from({ length: n }, (_, i) => i / fps), o, async () => {
+    const { data } = ctx.getImageData(0, 0, W, H), palette = quantize(data, 256);
+    gif.writeFrame(applyPalette(data, palette), W, H, { palette, delay: 1000 / fps });
+  });
+  if (!ok) return null;
+  gif.finish();
+  return { blob: new Blob([gif.bytes()], { type: 'image/gif' }), ext: 'gif' };
+}
+
+/** The frame under the playhead as a PNG image. */
+export async function exportFrame(short: number): Promise<Exported | null> {
+  const r = setup(short);
+  await renderTimes(r, [Math.min(S.t, Math.max(0, r.end - 1e-3))], { onProgress: () => {}, isCancelled: () => false }, async () => {});
+  const blob = await new Promise<Blob | null>(ok => r.canvas.toBlob(ok, 'image/png'));
+  return blob ? { blob, ext: 'png' } : null;
 }
